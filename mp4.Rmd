@@ -2,10 +2,57 @@
 title: "mp4"
 author: "Ben Raivel"
 date: "4/29/2019"
-output: html_document
+output:
+  html_document:
+    code_folding: hide
 ---
 
-```{r}
+```{r, message = FALSE, warning = FALSE}
+library(tidyverse)
+library(RMySQL)
+db <- dbConnect(MySQL(), 
+                host = "scidb.smith.edu", 
+                user = "mth292", 
+                password = "RememberPi", 
+                dbname = "citibike")
+knitr::opts_chunk$set(connection = db, max.print = 20)
+
+data <- dbGetQuery(db,
+                   "SELECT DISTINCT trips.duration, trips.start_station_id, trips.end_station_id, 
+s1.name as start, s2.name as end, s1.avg_lat as start_lat, 
+s1.avg_lon as start_lon, s2.avg_lat as end_lat, s2.avg_lon as end_lon,
+trips.user_type, trips.birth_year, trips.gender, trips.start_time
+FROM citibike.trips
+JOIN citibike.station_months s1 ON trips.start_station_id = s1.station_id
+JOIN citibike.station_months s2 ON trips.end_station_id = s2.station_id
+WHERE  trips.bike_id = '27315' AND trips.start_time BETWEEN '2017-05-01 00:00:00' AND '2017-06-01 00:00:00';")
 
 ```
+```{r, message=FALSE, warning=FALSE}
+library(sf)
+library(leaflet)
+
+data1 <- select(data, "start_time", "start_lon", "start_lat")
+data2 <- select(data, "start_time", "end_lon", "end_lat")
+
+data1_sf <- st_as_sf(data1, coords = c("start_lon","start_lat"))
+data2_sf <- st_as_sf(data2, coords = c("end_lon","end_lat"))
+
+sf_bind <- rbind(data1_sf, data2_sf)
+
+line_sf <- sf_bind %>%
+  group_by(start_time) %>%
+  summarize(do_union = FALSE) %>%
+  st_cast("LINESTRING") %>%
+  full_join(data, by = "start_time") %>%
+  select(start_time, duration, start_station_id, end_station_id)
+
+leaflet() %>%
+  addTiles() %>%
+  addPolylines(data = line_sf)
+
+ggplot() +
+  geom_sf(data = line_sf)
+```
+
 

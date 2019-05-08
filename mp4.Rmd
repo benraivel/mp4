@@ -25,9 +25,13 @@ trips.user_type, trips.birth_year, trips.gender, trips.start_time
 FROM citibike.trips
 JOIN citibike.station_months s1 ON trips.start_station_id = s1.station_id
 JOIN citibike.station_months s2 ON trips.end_station_id = s2.station_id
-WHERE  trips.bike_id = '27315' AND trips.start_time BETWEEN '2017-05-01 00:00:00' AND '2017-06-01 00:00:00';")
+WHERE   trips.start_time BETWEEN '2017-07-01 11:00:00' AND '2017-07-01 11:10:00';")
+
+station_months <- dbGetQuery(db,
+                             "SELECT * FROM citibike.station_months;")
 
 ```
+
 ```{r, message=FALSE, warning=FALSE}
 library(sf)
 library(leaflet)
@@ -45,11 +49,21 @@ line_sf <- sf_bind %>%
   summarize(do_union = FALSE) %>%
   st_cast("LINESTRING") %>%
   full_join(data, by = "start_time") %>%
-  select(start_time, duration, start_station_id, end_station_id)
+  select(start_time, duration, start_station_id, end_station_id, geometry)
+
+station_months_sf <- station_months %>%
+  st_as_sf(coords = c("avg_lon", "avg_lat")) %>%
+  mutate(net_starts = ((num_starts/num_stops)))%>%
+  filter(num_starts > 1000)
+
+pal <- colorNumeric(palette = "viridis", domain = station_months_sf$net_starts)
 
 leaflet() %>%
   addTiles() %>%
-  addPolylines(data = line_sf)
+  addCircleMarkers(data = station_months_sf, radius = 2, color = ~pal(net_starts))
+
+#ggplot()+
+  #geom_histogram(data = station_months_sf, aes(x = net_starts))
 
 ggplot() +
   geom_sf(data = line_sf)

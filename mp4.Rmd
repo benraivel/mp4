@@ -69,4 +69,10 @@ ggplot() +
   geom_sf(data = line_sf)
 ```
 
-
+```{r}
+dataPen15 <- dbGetQuery(db, "select start_station_id, end_station_id, count(*) as pen15
+from citibike.trips
+group by start_station_id, end_station_id
+order by pen15 desc
+limit 5000")
+```

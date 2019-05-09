@@ -70,9 +70,46 @@ ggplot() +
 ```
 
 ```{r}
-dataPen15 <- dbGetQuery(db, "select start_station_id, end_station_id, count(*) as pen15
+dataPen15 <- dbGetQuery(db, "select start_station_id as station_id, end_station_id, count(*) as pen15
 from citibike.trips
 group by start_station_id, end_station_id
 order by pen15 desc
 limit 5000")
+
 ```
+
+```{r}
+join_data <- station_months%>%
+  select(station_id, avg_lon, avg_lat)
+
+
+
+pen15final <- dataPen15 %>%
+  left_join (station_months, by = "station_id") %>%
+  left_join(station_months, by = c("end_station_id" = "station_id")) %>%
+  select(pen15, avg_lon.x, avg_lat.x, avg_lon.y, avg_lat.y) %>%
+  distinct()
+
+point1df <- select(pen15final, pen15, avg_lon.x, avg_lat.x)
+point2df <- select(pen15final, pen15, avg_lon.y, avg_lat.y)
+
+point1_sf <- st_as_sf(point1df, coords = c("avg_lon.x","avg_lat.x"))
+point2_sf <- st_as_sf(point2df, coords = c("avg_lon.y","avg_lat.y"))
+
+point_bind <- rbind(point1_sf, point2_sf)
+
+point_sf <- point_bind %>%
+  group_by(pen15) %>%
+  summarize(do_union = FALSE) %>%
+  st_cast("LINESTRING")
+
+#ggplot()+
+  #geom_sf(data = point_sf, aes(color = pen15, alpha = pen15/(max(pen15)*100)))
+pal <- colorNumeric(palette = "viridis", domain = point_sf$pen15)
+
+leaflet() %>%
+  addTiles() %>%
+  addPolylines(data = point_sf, color = ~pal(pen15), opacity = (1-pen15final$pen15/max(pen15final$pen15)))
+```
+
+

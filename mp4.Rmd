@@ -70,4 +70,6 @@ leaflet() %>%
 
 <iframe width="560" height="315" src="https://www.youtube.com/embed/iWwr13pY76E" frameborder="0" allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
 
+<img src="https://d21xlh2maitm24.cloudfront.net/nyc/01unlock2.JPG?mtime=20160428123800" alt = "pic" />
+
 [Github Repository](https://github.com/benraivel/mp4)

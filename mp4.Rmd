@@ -107,9 +107,6 @@ limit 100")
 ```
 
 ```{r}
-join_data <- station_months%>%
-  select(station_id, avg_lon, avg_lat)
-
 
 pen15final <- dataPen15 %>%
   left_join (station_months, by = "station_id") %>%
@@ -138,9 +135,9 @@ leaflet() %>%
   addTiles() %>%
   addPolylines(data = point_sf, color = ~pal(pen15), opacity = (1-pen15final$pen15/max(pen15final$pen15)))
 
-age_dist_sub %>%
-  ggplot(aes(x = age, y = count_sub)) +
-  geom_line()
+#age_dist_sub %>%
+  #ggplot(aes(x = age, y = count_sub)) +
+  #geom_line()
 ```
 
-
+[testing 123 this is link](https://github.com/benraivel/mp4)

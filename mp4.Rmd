@@ -98,8 +98,10 @@ leaflet() %>%
 ```
 
 ```{r}
-dataPen15 <- dbGetQuery(db, "select start_station_id as station_id, end_station_id, count(*) as pen15
+dataPen15 <- dbGetQuery(db, "select start_station_id as station_id, end_station_id, 2018 - avg(birth_year) as age, count(*) as pen15
 from citibike.trips
+where birth_year is not null
+and birth_year != 0
 group by start_station_id, end_station_id
 order by pen15 desc
 limit 100")
@@ -140,4 +142,4 @@ leaflet() %>%
   #geom_line()
 ```
 
-[testing 123 this is link](https://github.com/benraivel/mp4)
+[Github Repository](https://github.com/benraivel/mp4)

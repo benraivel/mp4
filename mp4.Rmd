@@ -10,6 +10,10 @@ output:
 ```{r, message = FALSE, warning = FALSE}
 library(tidyverse)
 library(RMySQL)
+library(sf)
+library(leaflet)
+
+
 db <- dbConnect(MySQL(), 
                 host = "scidb.smith.edu", 
                 user = "mth292", 
@@ -17,87 +21,6 @@ db <- dbConnect(MySQL(),
                 dbname = "citibike")
 knitr::opts_chunk$set(connection = db, max.print = 20)
 
-data <- dbGetQuery(db,
-                   "SELECT DISTINCT trips.duration, trips.start_station_id, trips.end_station_id, 
-s1.name as start, s2.name as end, s1.avg_lat as start_lat, 
-s1.avg_lon as start_lon, s2.avg_lat as end_lat, s2.avg_lon as end_lon,
-trips.user_type, trips.birth_year, trips.gender, trips.start_time
-FROM citibike.trips
-JOIN citibike.station_months s1 ON trips.start_station_id = s1.station_id
-JOIN citibike.station_months s2 ON trips.end_station_id = s2.station_id
-WHERE   trips.start_time BETWEEN '2017-07-01 11:00:00' AND '2017-07-01 11:10:00';")
-
-station_months <- dbGetQuery(db,
-                             "SELECT * FROM citibike.station_months;")
-
-age_dist_sub <- dbGetQuery(db,
-                       "SELECT birth_year, count(*) as count_sub
-FROM citibike.trips
-where user_type = 'Subscriber' && birth_year > 1939
-group by birth_year;") %>%
-  mutate(age = 2017 - birth_year)
-  
-
-
-
-#This data is the result of an SQL query, however the query took 797 seconds to run so I exported the result as a csv and uploaded it to our github repository so the data can be loaded using read_csv() and the document can be knitted much quicker
-
-#SQL query:
-#SELECT start_station_id, end_station_id, avg(duration), count(*) as trips, user_type
-#FROM citibike.trips
-#group by start_station_id, end_station_id, user_type
-#having (trips > 10 and user_type = "Customer") or (trips > 100 and user_type = "Subscriber");
-
-customerSubscriber <- read_csv("https://raw.githubusercontent.com/benraivel/mp4/master/CustomerVSSubscriberData.csv")
-
-```
-
-```{r}
-customerSubscriber %>%
-  group_by(user_type) %>%
-  summarise(mean = mean(`avg(duration)`))
-```
-
-
-```{r, message=FALSE, warning=FALSE}
-library(sf)
-library(leaflet)
-
-data1 <- select(data, "start_time", "start_lon", "start_lat")
-data2 <- select(data, "start_time", "end_lon", "end_lat")
-
-data1_sf <- st_as_sf(data1, coords = c("start_lon","start_lat"))
-data2_sf <- st_as_sf(data2, coords = c("end_lon","end_lat"))
-
-sf_bind <- rbind(data1_sf, data2_sf)
-
-line_sf <- sf_bind %>%
-  group_by(start_time) %>%
-  summarize(do_union = FALSE) %>%
-  st_cast("LINESTRING") %>%
-  full_join(data, by = "start_time") %>%
-  select(start_time, duration, start_station_id, end_station_id, geometry)
-
-station_months_sf <- station_months %>%
-  st_as_sf(coords = c("avg_lon", "avg_lat")) %>%
-  mutate(net_starts = ((num_starts/num_stops)))%>%
-  filter(num_starts > 2000)
-
-pal <- colorNumeric(palette = "viridis", domain = station_months_sf$num_starts)
-
-
-
-#ggplot()+
-  #geom_histogram(data = station_months_sf, aes(x = num_starts))
-
-#ggplot() +
-  #geom_sf(data = line_sf)
-leaflet() %>%
-  addTiles() %>%
-  addCircleMarkers(data = station_months_sf, radius = 3, color = ~pal(num_starts))
-```
-
-```{r}
 queried_data <- dbGetQuery(db, "SELECT t1.station_id, t1.end_station_id, s1.avg_lat as start_lat, 
 s1.avg_lon as start_lon, s2.avg_lat as end_lat, s2.avg_lon as end_lon, travelcount as travels
 FROM (select start_station_id as station_id, end_station_id, 2018 - avg(birth_year) as age, count(*) as travelcount
@@ -112,19 +35,12 @@ JOIN citibike.station_months s2 ON t1.end_station_id = s2.station_id
 group by t1.station_id, t1.end_station_id
 order by travels desc
 limit 100;")
-
 ```
 
 ```{r}
 
-pen15final <- queried_data %>%
-  left_join (station_months, by = "station_id") %>%
-  left_join(station_months, by = c("end_station_id" = "station_id")) %>%
-  select(pen15, avg_lon.x, avg_lat.x, avg_lon.y, avg_lat.y) %>%
-  distinct()
-
-point1df <- select(pen15final, pen15, avg_lon.x, avg_lat.x)
-point2df <- select(pen15final, pen15, avg_lon.y, avg_lat.y)
+point1df <- select(queried_data, pen15, avg_lon.x, avg_lat.x)
+point2df <- select(queried_data, pen15, avg_lon.y, avg_lat.y)
 
 point1_sf <- st_as_sf(point1df, coords = c("avg_lon.x","avg_lat.x"))
 point2_sf <- st_as_sf(point2df, coords = c("avg_lon.y","avg_lat.y"))
@@ -136,17 +52,11 @@ point_sf <- point_bind %>%
   summarize(do_union = FALSE) %>%
   st_cast("LINESTRING")
 
-#ggplot()+
-  #geom_sf(data = point_sf, aes(color = pen15, alpha = pen15/(max(pen15)*100)))
 pal <- colorNumeric(palette = "viridis", domain = point_sf$pen15)
 
 leaflet() %>%
   addTiles() %>%
-  addPolylines(data = point_sf, color = ~pal(pen15), opacity = (1-pen15final$pen15/max(pen15final$pen15)))
-
-#age_dist_sub %>%
-  #ggplot(aes(x = age, y = count_sub)) +
-  #geom_line()
+  addPolylines(data = point_sf, color = ~pal(pen15), opacity = 1)
 ```
 
 <iframe width="560" height="315" src="https://www.youtube.com/embed/iWwr13pY76E" frameborder="0" allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>

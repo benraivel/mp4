@@ -98,13 +98,20 @@ leaflet() %>%
 ```
 
 ```{r}
-dataPen15 <- dbGetQuery(db, "select start_station_id as station_id, end_station_id, 2018 - avg(birth_year) as age, count(*) as pen15
+dataPen15 <- dbGetQuery(db, "SELECT t1.station_id, t1.end_station_id, s1.avg_lat as start_lat, 
+s1.avg_lon as start_lon, s2.avg_lat as end_lat, s2.avg_lon as end_lon, pen15 as travels
+FROM (select start_station_id as station_id, end_station_id, 2018 - avg(birth_year) as age, count(*) as pen15
 from citibike.trips
 where birth_year is not null
 and birth_year != 0
 group by start_station_id, end_station_id
 order by pen15 desc
-limit 100")
+limit 100) as t1
+JOIN citibike.station_months s1 ON t1.station_id = s1.station_id
+JOIN citibike.station_months s2 ON t1.end_station_id = s2.station_id
+group by t1.station_id, t1.end_station_id
+order by travels desc
+limit 100;")
 
 ```
 

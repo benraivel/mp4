@@ -30,6 +30,15 @@ WHERE   trips.start_time BETWEEN '2017-07-01 11:00:00' AND '2017-07-01 11:10:00'
 station_months <- dbGetQuery(db,
                              "SELECT * FROM citibike.station_months;")
 
+age_dist_sub <- dbGetQuery(db,
+                       "SELECT birth_year, count(*) as count_sub
+FROM citibike.trips
+where user_type = 'Subscriber' && birth_year > 1939
+group by birth_year;") %>%
+  mutate(age = 2017 - birth_year)
+  
+
+
 
 #This data is the result of an SQL query, however the query took 797 seconds to run so I exported the result as a csv and uploaded it to our github repository so the data can be loaded using read_csv() and the document can be knitted much quicker
 
@@ -128,6 +137,10 @@ pal <- colorNumeric(palette = "viridis", domain = point_sf$pen15)
 leaflet() %>%
   addTiles() %>%
   addPolylines(data = point_sf, color = ~pal(pen15), opacity = (1-pen15final$pen15/max(pen15final$pen15)))
+
+age_dist_sub %>%
+  ggplot(aes(x = age, y = count_sub)) +
+  geom_line()
 ```
 
 

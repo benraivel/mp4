@@ -8,12 +8,13 @@ output:
 ---
 
 ```{r, message = FALSE, warning = FALSE}
+#we load in the necessary packages
 library(tidyverse)
 library(RMySQL)
 library(sf)
 library(leaflet)
 
-
+#we connect to the scidb database
 db <- dbConnect(MySQL(), 
                 host = "scidb.smith.edu", 
                 user = "mth292", 
@@ -21,9 +22,14 @@ db <- dbConnect(MySQL(),
                 dbname = "citibike")
 knitr::opts_chunk$set(connection = db, max.print = 20)
 
-queried_data <- dbGetQuery(db, "SELECT t1.station_id, t1.end_station_id, s1.avg_lat as start_lat, 
+#we make an sql query and store the result as queried_data
+#queried_data is a data frame with each row as a specific route. This means that for every pairing of start and end location, there is a row in this data frame. For analyzation purposes, we took the most popular 100 routes. 
+#The data frame has 5 columns. start_lat and start_lon are the latitude and longitude of the starting location, with end_lat and end_lon as the latitude and longitude of the ending location. Our final column, travels, is the number of times people took that route.
+#We use nested queries to improve query times. Initially, we did our joinings to get location data while calculating travels and then took the top 100 travels. This took forever. A much more efficient method was to calculate the top 100 travels, and then only join the location data onto that much smaller table with 100 rows.
+#The query finds the most popular 100 routes, and then joins that data onto station_months twice in order to get location information for the starting and ending location. From here, we select the 5 rows mentioned earlier: the latitudes and longitudes for starting and ending location and the amount of times each route was travelled.
+queried_data <- dbGetQuery(db, "SELECT s1.avg_lat as start_lat, 
 s1.avg_lon as start_lon, s2.avg_lat as end_lat, s2.avg_lon as end_lon, travelcount as travels
-FROM (select start_station_id as station_id, end_station_id, 2018 - avg(birth_year) as age, count(*) as travelcount
+FROM (select start_station_id as station_id, end_station_id, count(*) as travelcount
 from citibike.trips
 group by start_station_id, end_station_id
 order by travelcount desc
@@ -36,22 +42,27 @@ limit 100;")
 ```
 
 ```{r}
-
+#we create two point data frames from our sql query
 point1df <- select(queried_data, travels, start_lon, start_lat)
 point2df <- select(queried_data, travels, end_lon, end_lat)
 
+#then we convert to an sf geometry object
 point1_sf <- st_as_sf(point1df, coords = c("start_lon","start_lat"))
 point2_sf <- st_as_sf(point2df, coords = c("end_lon","end_lat"))
 
+#these two tables are merged
 point_bind <- rbind(point1_sf, point2_sf)
 
+#these pairs of points are turned into linestrings
 point_sf <- point_bind %>%
   group_by(travels) %>%
   summarize(do_union = FALSE) %>%
   st_cast("LINESTRING")
 
+#we chose the palette viridis for our graph, as it's able to show a difference in popularity between the top 100 as opposed to monochromatic palettes
 pal <- colorNumeric(palette = "viridis", domain = point_sf$travels)
 
+#and we construct our final graph
 leaflet() %>%
   addTiles() %>%
   addPolylines(data = point_sf, color = ~pal(travels), opacity = 1)

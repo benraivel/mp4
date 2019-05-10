@@ -25,8 +25,6 @@ queried_data <- dbGetQuery(db, "SELECT t1.station_id, t1.end_station_id, s1.avg_
 s1.avg_lon as start_lon, s2.avg_lat as end_lat, s2.avg_lon as end_lon, travelcount as travels
 FROM (select start_station_id as station_id, end_station_id, 2018 - avg(birth_year) as age, count(*) as travelcount
 from citibike.trips
-where birth_year is not null
-and birth_year != 0
 group by start_station_id, end_station_id
 order by travelcount desc
 limit 100) as t1
@@ -39,24 +37,24 @@ limit 100;")
 
 ```{r}
 
-point1df <- select(queried_data, pen15, avg_lon.x, avg_lat.x)
-point2df <- select(queried_data, pen15, avg_lon.y, avg_lat.y)
+point1df <- select(queried_data, travels, start_lon, start_lat)
+point2df <- select(queried_data, travels, end_lon, end_lat)
 
-point1_sf <- st_as_sf(point1df, coords = c("avg_lon.x","avg_lat.x"))
-point2_sf <- st_as_sf(point2df, coords = c("avg_lon.y","avg_lat.y"))
+point1_sf <- st_as_sf(point1df, coords = c("start_lon","start_lat"))
+point2_sf <- st_as_sf(point2df, coords = c("end_lon","end_lat"))
 
 point_bind <- rbind(point1_sf, point2_sf)
 
 point_sf <- point_bind %>%
-  group_by(pen15) %>%
+  group_by(travels) %>%
   summarize(do_union = FALSE) %>%
   st_cast("LINESTRING")
 
-pal <- colorNumeric(palette = "viridis", domain = point_sf$pen15)
+pal <- colorNumeric(palette = "viridis", domain = point_sf$travels)
 
 leaflet() %>%
   addTiles() %>%
-  addPolylines(data = point_sf, color = ~pal(pen15), opacity = 1)
+  addPolylines(data = point_sf, color = ~pal(travels), opacity = 1)
 ```
 
 <iframe width="560" height="315" src="https://www.youtube.com/embed/iWwr13pY76E" frameborder="0" allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
